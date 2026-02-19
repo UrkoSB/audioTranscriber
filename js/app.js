@@ -1,8 +1,30 @@
-let transcript="";
+const drop = document.getElementById("dropZone");
+const input = document.getElementById("file");
+let transcript = "";
+
+// click abre selector
+drop.onclick = () => input.click();
+
+// drag visual
+drop.ondragover = e => {
+  e.preventDefault();
+  drop.classList.add("drag");
+};
+
+drop.ondragleave = () => drop.classList.remove("drag");
+
+drop.ondrop = e => {
+  e.preventDefault();
+  drop.classList.remove("drag");
+  input.files = e.dataTransfer.files;
+  upload();
+};
+
+input.onchange = upload;
 
 async function upload(){
-  const file=document.getElementById("file").files[0];
-  if(!file) return alert("Selecciona audio");
+  const file=input.files[0];
+  if(!file) return;
 
   document.getElementById("status").innerText="Transcribiendo... puede tardar";
 
@@ -18,9 +40,10 @@ async function upload(){
   transcript=data.text;
 
   document.getElementById("result").value=transcript;
-  document.getElementById("status").innerText="✅ listo";
+  document.getElementById("status").innerText="✅ Transcripción lista";
 }
 
+// descargar txt
 function downloadTxt(){
   const blob=new Blob([transcript],{type:"text/plain"});
   const a=document.createElement("a");

@@ -22,18 +22,24 @@ app.post("/transcribe", upload.single("audio"), (req, res) => {
   console.log("🧠 Transcribiendo:", inputPath);
 
   const cmd = `
-source whisper-env/bin/activate && python - <<EOF
+python3 - <<EOF
 from faster_whisper import WhisperModel
+
 model = WhisperModel("medium", compute_type="int8")
 segments, info = model.transcribe("${inputPath}")
+
 text=""
 for s in segments:
-    text += s.text + " "
+    line = s.text.strip()
+    if not line:
+        continue
+    text += line + " "
+
 open("${txtOutput}","w").write(text)
 print("DONE")
 EOF`;
 
-  exec(cmd, { shell: "/bin/bash" }, (err, stdout, stderr) => {
+  exec(cmd, (err, stdout, stderr) => {
 
     console.log(stdout);
     console.log(stderr);
@@ -52,6 +58,9 @@ EOF`;
   });
 });
 
-app.listen(3000, () =>
-  console.log("🚀 audioTranscriber en http://localhost:3000")
-);
+const server = app.listen(3000, () => {
+  console.log("🚀 audioTranscriber en http://localhost:3000");
+});
+
+// mantener proceso vivo en Mac
+process.stdin.resume();

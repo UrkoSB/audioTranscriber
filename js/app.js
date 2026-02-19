@@ -1,11 +1,14 @@
 const drop = document.getElementById("dropZone");
 const input = document.getElementById("file");
-let transcript = "";
+const result = document.getElementById("result");
+const statusText = document.getElementById("status");
 
-// click abre selector
+let transcript="";
+let controller;
+
+// drag & drop
 drop.onclick = () => input.click();
 
-// drag visual
 drop.ondragover = e => {
   e.preventDefault();
   drop.classList.add("drag");
@@ -26,25 +29,44 @@ async function upload(){
   const file=input.files[0];
   if(!file) return;
 
-  document.getElementById("status").innerText="Transcribiendo... puede tardar";
+  result.value="";
+  transcript="";
+  statusText.innerText="Transcribiendo...";
 
   const form=new FormData();
   form.append("audio",file);
 
-  const res=await fetch("http://localhost:3000/transcribe",{
+  // abrir stream
+  const evt=new EventSource("http://localhost:3000/stream");
+
+  evt.onmessage=e=>{
+    if(e.data==="__END__"){
+      statusText.innerText="✅ completado";
+      evt.close();
+      return;
+    }
+
+    transcript+=e.data+" ";
+    result.value=transcript;
+  };
+
+  // subir audio
+  fetch("http://localhost:3000/transcribe",{
     method:"POST",
     body:form
   });
-
-  const data=await res.json();
-  transcript=data.text;
-
-  document.getElementById("result").value=transcript;
-  document.getElementById("status").innerText="✅ Transcripción lista";
 }
 
-// descargar txt
+// abortar
+function abortTranscription(){
+  fetch("http://localhost:3000/abort",{method:"POST"});
+  statusText.innerText="⛔ abortado";
+}
+
+// descargar
 function downloadTxt(){
+  if(!transcript) return;
+
   const blob=new Blob([transcript],{type:"text/plain"});
   const a=document.createElement("a");
   a.href=URL.createObjectURL(blob);

@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>audioTranscriber by Urko SB [Zemouz.com]</title>
 
-
 <style>
 body{
   background:#0f1117;
@@ -15,8 +14,6 @@ body{
   padding:40px
 }
 
-h1{margin-bottom:10px}
-
 .drop{
   border:2px dashed #666;
   padding:60px;
@@ -24,7 +21,6 @@ h1{margin-bottom:10px}
   margin:30px auto;
   cursor:pointer;
   border-radius:12px;
-  transition:0.2s;
 }
 
 .drop.drag{
@@ -48,17 +44,18 @@ button{
   margin-top:15px;
   border:none;
   border-radius:8px;
-  background:#00ff88;
-  color:#000;
+  margin-right:10px;
   cursor:pointer;
 }
+
+.primary{background:#00ff88;color:#000}
+.abort{background:#ff4d4d;color:#fff}
 </style>
 </head>
 
 <body>
 
 <h1>🎙️ audioTranscriber</h1>
-<p>Arrastra un audio o haz click</p>
 
 <div class="drop" id="dropZone">
   Drop audio here or click
@@ -67,9 +64,11 @@ button{
 
 <p id="status"></p>
 
-<textarea id="result" placeholder="Transcripción..."></textarea>
+<textarea id="result"></textarea>
 <br>
-<button onclick="downloadTxt()">Descargar TXT</button>
+
+<button class="primary" onclick="downloadTxt()">Descargar TXT</button>
+<button class="abort" onclick="abortTranscription()">ABORTAR</button>
 
 <script src="js/app.js"></script>
 </body>

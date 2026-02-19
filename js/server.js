@@ -1,66 +1,91 @@
 import express from "express";
 import multer from "multer";
 import cors from "cors";
-import { exec } from "child_process";
 import fs from "fs";
 import path from "path";
+import { spawn } from "child_process";
 
 const app = express();
 app.use(cors());
+app.use(express.json());
 
 const upload = multer({ dest: "uploads/" });
 
-if (!fs.existsSync("uploads")) fs.mkdirSync("uploads");
-if (!fs.existsSync("output")) fs.mkdirSync("output");
+let currentProcess = null;
+let streamClient = null;
 
-app.post("/transcribe", upload.single("audio"), (req, res) => {
+// ================= STREAM TEXTO AL NAVEGADOR =================
+app.get("/stream", (req, res) => {
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.flushHeaders();
 
-  const inputPath = req.file.path;
-  const base = path.parse(req.file.originalname).name;
-  const txtOutput = `output/${base}.txt`;
+  streamClient = res;
 
-  console.log("🧠 Transcribiendo:", inputPath);
-
-  const cmd = `
-python3 - <<EOF
-from faster_whisper import WhisperModel
-
-model = WhisperModel("medium", compute_type="int8")
-segments, info = model.transcribe("${inputPath}")
-
-text=""
-for s in segments:
-    line = s.text.strip()
-    if not line:
-        continue
-    text += line + " "
-
-open("${txtOutput}","w").write(text)
-print("DONE")
-EOF`;
-
-  exec(cmd, (err, stdout, stderr) => {
-
-    console.log(stdout);
-    console.log(stderr);
-
-    if (err) {
-      console.log("ERROR:", err);
-      return res.status(500).send("error transcribing");
-    }
-
-    const text = fs.readFileSync(txtOutput, "utf8");
-
-    res.json({
-      text,
-      filename: base + ".txt"
-    });
+  req.on("close", () => {
+    streamClient = null;
   });
 });
 
-const server = app.listen(3000, () => {
-  console.log("🚀 audioTranscriber en http://localhost:3000");
+// ================= INICIAR TRANSCRIPCIÓN =================
+app.post("/transcribe", upload.single("audio"), (req, res) => {
+
+  const inputPath = req.file.path;
+  console.log("🧠 Transcribiendo:", inputPath);
+
+  const pyCode = `
+from faster_whisper import WhisperModel
+model = WhisperModel("medium", compute_type="int8")
+segments, info = model.transcribe("${inputPath}")
+
+for s in segments:
+    t = s.text.strip()
+    if t:
+        print(t, flush=True)
+
+print("__END__", flush=True)
+`;
+
+  currentProcess = spawn("python3", ["-u", "-c", pyCode]);
+
+  // recibir texto en vivo
+  currentProcess.stdout.on("data", (data) => {
+    const text = data.toString().trim();
+    if (!text) return;
+
+    if (streamClient) {
+      streamClient.write("data: " + text + "\n\n");
+    }
+  });
+
+  currentProcess.stderr.on("data", (data) => {
+    console.log("PY ERR:", data.toString());
+  });
+
+  currentProcess.on("close", () => {
+    console.log("🟢 Proceso terminado");
+    currentProcess = null;
+  });
+
+  res.json({ started: true });
 });
 
-// mantener proceso vivo en Mac
+// ================= ABORTAR =================
+app.post("/abort", (req, res) => {
+  if (currentProcess) {
+    console.log("⛔ Abortando transcripción");
+    currentProcess.kill("SIGKILL");
+    currentProcess = null;
+  }
+  res.json({ aborted: true });
+});
+
+// ================= SERVER =================
+app.listen(3000, () => {
+  console.log("🚀 audioTranscriber realtime en http://localhost:3000");
+});
+
+// mantener vivo en mac
 process.stdin.resume();
+0
